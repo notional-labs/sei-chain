@@ -11,7 +11,7 @@ var _ sdk.Msg = &MsgPlaceOrders{}
 
 func NewMsgPlaceOrders(
 	creator string,
-	orders []*OrderPlacement,
+	orders []*Order,
 	contractAddr string,
 	fund sdk.Coins,
 ) *MsgPlaceOrders {
@@ -44,6 +44,7 @@ func (msg *MsgPlaceOrders) GetSignBytes() []byte {
 	return sdk.MustSortJSON(bz)
 }
 
+// perform statelss check on basic property of msg like sig verification
 func (msg *MsgPlaceOrders) ValidateBasic() error {
 	_, err := sdk.AccAddressFromBech32(msg.Creator)
 	if err != nil {

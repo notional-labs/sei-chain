@@ -2,20 +2,20 @@ package exchange
 
 import (
 	sdk "github.com/cosmos/cosmos-sdk/types"
-	dexcache "github.com/sei-protocol/sei-chain/x/dex/cache"
 	"github.com/sei-protocol/sei-chain/x/dex/types"
 )
 
 func MatchMarketOrders(
 	ctx sdk.Context,
-	marketOrders []dexcache.MarketOrder,
+	marketOrders []types.Order,
 	orderBook []types.OrderBook,
-	pair types.Pair,
 	direction types.PositionDirection,
 	dirtyPrices *DirtyPrices,
-	settlements *[]*types.Settlement,
+	settlements *[]*types.SettlementEntry,
+	zeroOrders *[]AccountOrderID,
 ) (sdk.Dec, sdk.Dec) {
-	var totalExecuted, totalPrice sdk.Dec = sdk.ZeroDec(), sdk.ZeroDec()
+	totalExecuted, totalPrice := sdk.ZeroDec(), sdk.ZeroDec()
+	allTakerSettlements := []*types.SettlementEntry{}
 	for idx, marketOrder := range marketOrders {
 		for i := range orderBook {
 			var existingOrder types.OrderBook
@@ -27,9 +27,15 @@ func MatchMarketOrders(
 			if existingOrder.GetEntry().Quantity.IsZero() {
 				continue
 			}
-			if (direction == types.PositionDirection_LONG && marketOrder.WorstPrice.LT(existingOrder.GetPrice())) ||
-				(direction == types.PositionDirection_SHORT && marketOrder.WorstPrice.GT(existingOrder.GetPrice())) {
-				break
+			// If price is zero, it means the order sender
+			// doesn't want to specify a worst price, so
+			// we don't need to perform price check for such orders
+			if !marketOrder.Price.IsZero() {
+				// Check if worst price can be matched against order book
+				if (direction == types.PositionDirection_LONG && marketOrder.Price.LT(existingOrder.GetPrice())) ||
+					(direction == types.PositionDirection_SHORT && marketOrder.Price.GT(existingOrder.GetPrice())) {
+					break
+				}
 			}
 			var executed sdk.Dec
 			if marketOrder.Quantity.LTE(existingOrder.GetEntry().Quantity) {
@@ -40,16 +46,33 @@ func MatchMarketOrders(
 			marketOrder.Quantity = marketOrder.Quantity.Sub(executed)
 			totalExecuted = totalExecuted.Add(executed)
 			totalPrice = totalPrice.Add(
-				executed.Mul(existingOrder.GetPrice().Add(marketOrder.WorstPrice)).Quo(sdk.NewDec(2)),
+				executed.Mul(existingOrder.GetPrice()),
 			)
 			dirtyPrices.Add(existingOrder.GetPrice())
-			newSettlements := Settle(marketOrder.FormattedCreatorWithSuffix(), executed, existingOrder, direction, marketOrder.WorstPrice)
-			*settlements = append(*settlements, newSettlements...)
+
+			takerSettlements, makerSettlements, zeroAccountOrders := Settle(
+				ctx,
+				marketOrder,
+				executed,
+				existingOrder,
+				marketOrder.Price,
+			)
+			*settlements = append(*settlements, makerSettlements...)
+			*zeroOrders = append(*zeroOrders, zeroAccountOrders...)
+			// taker settlements' clearing price will need to be adjusted after all market order executions finish
+			allTakerSettlements = append(allTakerSettlements, takerSettlements...)
 			if marketOrder.Quantity.IsZero() {
 				break
 			}
 		}
 		marketOrders[idx].Quantity = marketOrder.Quantity
+	}
+	if totalExecuted.IsPositive() {
+		clearingPrice := totalPrice.Quo(totalExecuted)
+		for _, settlement := range allTakerSettlements {
+			settlement.ExecutionCostOrProceed = clearingPrice
+		}
+		*settlements = append(*settlements, allTakerSettlements...)
 	}
 	return totalPrice, totalExecuted
 }

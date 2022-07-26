@@ -1,7 +1,6 @@
 package cli
 
 import (
-	"errors"
 	"strconv"
 	"strings"
 
@@ -26,57 +25,34 @@ func CmdPlaceOrders() *cobra.Command {
 		Args:  cobra.MinimumNArgs(2),
 		RunE: func(cmd *cobra.Command, args []string) (err error) {
 			argContractAddr := args[0]
-			orderPlacements := []*types.OrderPlacement{}
+			orders := []*types.Order{}
 			for _, order := range args[1:] {
-				orderPlacement := types.OrderPlacement{}
-				orderDetails := strings.Split(order, ",")
+				newOrder := types.Order{}
+				orderDetails := strings.Split(order, "?")
 				argPositionDir, err := types.GetPositionDirectionFromStr(orderDetails[0])
 				if err != nil {
 					return err
 				}
-				orderPlacement.PositionDirection = argPositionDir
+				newOrder.PositionDirection = argPositionDir
 				argPrice, err := sdk.NewDecFromStr(orderDetails[1])
 				if err != nil {
 					return err
 				}
-				orderPlacement.Price = argPrice
+				newOrder.Price = argPrice
 				argQuantity, err := sdk.NewDecFromStr(orderDetails[2])
 				if err != nil {
 					return err
 				}
-				orderPlacement.Quantity = argQuantity
-				reqPriceDenom, unit, err := types.GetDenomFromStr(orderDetails[3])
+				newOrder.Quantity = argQuantity
+				newOrder.PriceDenom = orderDetails[3]
+				newOrder.AssetDenom = orderDetails[4]
+				argOrderType, err := types.GetOrderTypeFromStr(orderDetails[5])
 				if err != nil {
 					return err
 				}
-				if unit != types.Unit_STANDARD {
-					return errors.New("Denom must be in standard/whole unit (e.g. sei instead of usei)")
-				}
-				reqAssetDenom, unit, err := types.GetDenomFromStr(orderDetails[4])
-				if err != nil {
-					return err
-				}
-				if unit != types.Unit_STANDARD {
-					return errors.New("Denom must be in standard/whole unit (e.g. sei instead of usei)")
-				}
-				orderPlacement.PriceDenom = reqPriceDenom
-				orderPlacement.AssetDenom = reqAssetDenom
-				argPositionEffect, err := types.GetPositionEffectFromStr(orderDetails[5])
-				if err != nil {
-					return err
-				}
-				orderPlacement.PositionEffect = argPositionEffect
-				argOrderType, err := types.GetOrderTypeFromStr(orderDetails[6])
-				if err != nil {
-					return err
-				}
-				orderPlacement.OrderType = argOrderType
-				argLeverage, err := sdk.NewDecFromStr(orderDetails[7])
-				if err != nil {
-					return err
-				}
-				orderPlacement.Leverage = argLeverage
-				orderPlacements = append(orderPlacements, &orderPlacement)
+				newOrder.OrderType = argOrderType
+				newOrder.Data = orderDetails[6]
+				orders = append(orders, &newOrder)
 			}
 
 			clientCtx, err := client.GetClientTxContext(cmd)
@@ -96,7 +72,7 @@ func CmdPlaceOrders() *cobra.Command {
 
 			msg := types.NewMsgPlaceOrders(
 				clientCtx.GetFromAddress().String(),
-				orderPlacements,
+				orders,
 				argContractAddr,
 				amount,
 			)

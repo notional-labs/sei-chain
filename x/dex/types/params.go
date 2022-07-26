@@ -1,8 +1,16 @@
 package types
 
 import (
+	fmt "fmt"
+
 	paramtypes "github.com/cosmos/cosmos-sdk/x/params/types"
 	"gopkg.in/yaml.v2"
+)
+
+var KeyPriceSnapshotRetention = []byte("PriceSnapshotRetention") // number of epochs to retain price snapshots for
+
+const (
+	DefaultPriceSnapshotRetention = 24 * 3600 // default to one day
 )
 
 var _ paramtypes.ParamSet = (*Params)(nil)
@@ -19,12 +27,16 @@ func NewParams() Params {
 
 // DefaultParams returns a default set of parameters
 func DefaultParams() Params {
-	return NewParams()
+	return Params{
+		PriceSnapshotRetention: DefaultPriceSnapshotRetention,
+	}
 }
 
 // ParamSetPairs get the params.ParamSet
 func (p *Params) ParamSetPairs() paramtypes.ParamSetPairs {
-	return paramtypes.ParamSetPairs{}
+	return paramtypes.ParamSetPairs{
+		paramtypes.NewParamSetPair(KeyPriceSnapshotRetention, &p.PriceSnapshotRetention, validatePriceSnapshotRetention),
+	}
 }
 
 // Validate validates the set of params
@@ -36,4 +48,17 @@ func (p Params) Validate() error {
 func (p Params) String() string {
 	out, _ := yaml.Marshal(p)
 	return string(out)
+}
+
+func validatePriceSnapshotRetention(i interface{}) error {
+	v, ok := i.(uint64)
+	if !ok {
+		return fmt.Errorf("invalid parameter type: %T", i)
+	}
+
+	if v == 0 {
+		return fmt.Errorf("price snapshot retention must be a positive integer: %d", v)
+	}
+
+	return nil
 }

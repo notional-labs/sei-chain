@@ -22,16 +22,16 @@ func Tally(ctx sdk.Context, pb types.ExchangeRateBallot, rewardBand sdk.Dec, val
 
 	for _, vote := range pb {
 		// Filter ballot winners
-		// abstaining counts as out of range and will be eventually penalized
+		key := vote.Voter.String()
+		claim := validatorClaimMap[key]
 		if vote.ExchangeRate.GTE(weightedMedian.Sub(rewardSpread)) &&
 			vote.ExchangeRate.LTE(weightedMedian.Add(rewardSpread)) {
 
-			key := vote.Voter.String()
-			claim := validatorClaimMap[key]
 			claim.Weight += vote.Power
 			claim.WinCount++
-			validatorClaimMap[key] = claim
 		}
+		claim.DidVote = true
+		validatorClaimMap[key] = claim
 	}
 
 	return
@@ -84,6 +84,5 @@ func pickReferenceDenom(ctx sdk.Context, k keeper.Keeper, voteTargets map[string
 			referenceDenom = denom
 		}
 	}
-
-	return
+	return referenceDenom, belowThresholdVoteMap
 }

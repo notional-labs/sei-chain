@@ -13,6 +13,7 @@ import (
 
 var DefaultRelativePacketTimeoutTimestamp = uint64((time.Duration(10) * time.Minute).Nanoseconds())
 
+//nolint:deadcode,unused // I assume we'll use this later.
 const (
 	flagPacketTimeoutTimestamp = "packet-timeout-timestamp"
 	listSeparator              = ","
@@ -30,8 +31,10 @@ func GetTxCmd() *cobra.Command {
 	cmd.AddCommand(CmdPlaceOrders())
 	cmd.AddCommand(CmdCancelOrders())
 	cmd.AddCommand(CmdLiquidate())
-	cmd.AddCommand(CmdRegisterPair())
 	cmd.AddCommand(CmdRegisterContract())
+	cmd.AddCommand(NewRegisterPairsProposalTxCmd())
+	cmd.AddCommand(NewUpdateTickSizeProposalTxCmd())
+	cmd.AddCommand(NewAddAssetProposalTxCmd())
 	// this line is used by starport scaffolding # 1
 
 	return cmd

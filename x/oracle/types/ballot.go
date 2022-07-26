@@ -182,15 +182,17 @@ type Claim struct {
 	Power     int64
 	Weight    int64
 	WinCount  int64
+	DidVote   bool
 	Recipient sdk.ValAddress
 }
 
 // NewClaim generates a Claim instance.
-func NewClaim(power, weight, winCount int64, recipient sdk.ValAddress) Claim {
+func NewClaim(power, weight, winCount int64, recipient sdk.ValAddress, didVote bool) Claim {
 	return Claim{
 		Power:     power,
 		Weight:    weight,
 		WinCount:  winCount,
+		DidVote:   didVote,
 		Recipient: recipient,
 	}
 }

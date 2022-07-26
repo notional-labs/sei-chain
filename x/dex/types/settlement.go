@@ -1,9 +1,6 @@
 package types
 
 import (
-	"fmt"
-	"strings"
-
 	sdk "github.com/cosmos/cosmos-sdk/types"
 )
 
@@ -18,57 +15,29 @@ type SudoSettlementMsg struct {
 	Settlement Settlements `json:"settlement"`
 }
 
-type Settlement struct {
-	Direction              PositionDirection
-	PriceSymbol            Denom
-	AssetSymbol            Denom
-	Quantity               sdk.Dec
-	ExecutionCostOrProceed sdk.Dec
-	ExpectedCostOrProceed  sdk.Dec
-	Account                string
-	Effect                 PositionEffect
-	Leverage               sdk.Dec
-}
-
-func NewSettlement(
-	formattedAccount string,
+func NewSettlementEntry(
+	ctx sdk.Context,
+	orderID uint64,
+	account string,
 	direction PositionDirection,
-	priceDenom Denom,
-	assetDenom Denom,
+	priceDenom string,
+	assetDenom string,
 	quantity sdk.Dec,
 	executionCostOrProceed sdk.Dec,
 	expectedCostOrProceed sdk.Dec,
-) *Settlement {
-	parts := strings.Split(formattedAccount, FORMATTED_ACCOUNT_DELIMITER)
-	leverage, _ := sdk.NewDecFromStr(parts[2])
-	return &Settlement{
-		Direction:              direction,
-		PriceSymbol:            priceDenom,
-		AssetSymbol:            assetDenom,
+	orderType OrderType,
+) *SettlementEntry {
+	return &SettlementEntry{
+		OrderId:                orderID,
+		PositionDirection:      GetContractPositionDirection(direction),
+		PriceDenom:             priceDenom,
+		AssetDenom:             assetDenom,
 		Quantity:               quantity,
 		ExecutionCostOrProceed: executionCostOrProceed,
 		ExpectedCostOrProceed:  expectedCostOrProceed,
-		Account:                parts[0],
-		Effect:                 SUFFIX_TO_POSITION_EFFECT[OPEN_ORDER_CREATOR_SUFFIX],
-		Leverage:               leverage,
-	}
-}
-
-func (s *Settlement) String() string {
-	return fmt.Sprintf(
-		"%s %d %s/%s: %d at %d/%d - %s", s.Account, s.Direction, s.PriceSymbol, s.AssetSymbol, s.Quantity, s.ExecutionCostOrProceed, s.ExpectedCostOrProceed, s.Leverage)
-}
-
-func (s *Settlement) ToEntry() SettlementEntry {
-	return SettlementEntry{
-		Account:                s.Account,
-		PriceDenom:             GetContractDenomName(s.PriceSymbol),
-		AssetDenom:             GetContractDenomName(s.AssetSymbol),
-		Quantity:               s.Quantity,
-		ExecutionCostOrProceed: s.ExecutionCostOrProceed,
-		ExpectedCostOrProceed:  s.ExpectedCostOrProceed,
-		PositionDirection:      GetContractPositionDirection(s.Direction),
-		PositionEffect:         GetContractPositionEffect(s.Effect),
-		Leverage:               s.Leverage,
+		Account:                account,
+		OrderType:              GetContractOrderType(orderType),
+		Timestamp:              uint64(ctx.BlockTime().Unix()),
+		Height:                 uint64(ctx.BlockHeight()),
 	}
 }

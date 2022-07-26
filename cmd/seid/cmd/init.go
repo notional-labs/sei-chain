@@ -6,13 +6,11 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"strings"
-	"time"
 
 	"github.com/cosmos/go-bip39"
 	"github.com/pkg/errors"
+	"github.com/sei-protocol/sei-chain/app/params"
 	"github.com/spf13/cobra"
-
 	tmcfg "github.com/tendermint/tendermint/config"
 	"github.com/tendermint/tendermint/libs/cli"
 	tmos "github.com/tendermint/tendermint/libs/os"
@@ -79,16 +77,8 @@ func InitCmd(mbm module.BasicManager, defaultNodeHome string) *cobra.Command {
 			serverCtx := server.GetServerContextFromCmd(cmd)
 			config := serverCtx.Config
 
-			// An easy way to run a lightweight seed node is to use tenderseed: github.com/binaryholdings/tenderseed
-			// TODO(psu) Add seeds for mainnet
-			seeds := []string{}
-			config.P2P.Seeds = strings.Join(seeds, ",")
-			config.P2P.MaxNumInboundPeers = 40
-			config.P2P.MaxNumOutboundPeers = 10
-			config.Mempool.Size = 500
-			config.StateSync.TrustPeriod = 168 * time.Hour
-			config.FastSync.Version = "v0"
-			config.Consensus.TimeoutCommit = 1 * time.Second
+			// Override default config.toml values with optimized values
+			params.SetTendermintConfigs(config)
 
 			config.SetRoot(clientCtx.HomeDir)
 

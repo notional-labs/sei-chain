@@ -57,7 +57,7 @@ func (q querier) ExchangeRate(c context.Context, req *types.QueryExchangeRateReq
 func (q querier) ExchangeRates(c context.Context, req *types.QueryExchangeRatesRequest) (*types.QueryExchangeRatesResponse, error) {
 	ctx := sdk.UnwrapSDKContext(c)
 
-	var exchangeRates types.DenomOracleExchangeRatePairs
+	exchangeRates := []types.DenomOracleExchangeRatePair{}
 	q.IterateBaseExchangeRates(ctx, func(denom string, rate types.OracleExchangeRate) (stop bool) {
 		if denom == utils.MicroBaseDenom {
 			votePeriod := q.Keeper.GetParams(ctx).VotePeriod
@@ -96,6 +96,38 @@ func (q querier) VoteTargets(c context.Context, req *types.QueryVoteTargetsReque
 	return &types.QueryVoteTargetsResponse{VoteTargets: q.GetVoteTargets(ctx)}, nil
 }
 
+func (q querier) PriceSnapshotHistory(c context.Context, req *types.QueryPriceSnapshotHistoryRequest) (*types.QueryPriceSnapshotHistoryResponse, error) {
+	ctx := sdk.UnwrapSDKContext(c)
+	priceSnapshots := types.PriceSnapshots{}
+	q.IteratePriceSnapshots(ctx, func(snapshot types.PriceSnapshot) (stop bool) {
+		priceSnapshots = append(priceSnapshots, snapshot)
+		return false
+	})
+	response := types.QueryPriceSnapshotHistoryResponse{PriceSnapshots: priceSnapshots}
+	return &response, nil
+}
+
+func (q querier) Twaps(c context.Context, req *types.QueryTwapsRequest) (*types.QueryTwapsResponse, error) {
+	if req == nil {
+		return nil, status.Error(codes.InvalidArgument, "invalid request")
+	}
+
+	ctx := sdk.UnwrapSDKContext(c)
+	twaps, err := q.CalculateTwaps(ctx, req.LookbackSeconds)
+	if err != nil {
+		if err == types.ErrInvalidTwapLookback {
+			return nil, status.Error(codes.InvalidArgument, err.Error())
+		}
+		if err == types.ErrNoTwapData {
+			return nil, status.Error(codes.FailedPrecondition, err.Error())
+		}
+		// we shouldnt get this
+		return nil, status.Error(codes.Unknown, err.Error())
+	}
+	response := types.QueryTwapsResponse{OracleTwaps: twaps}
+	return &response, nil
+}
+
 // FeederDelegation queries the account address that the validator operator delegated oracle vote rights to
 func (q querier) FeederDelegation(c context.Context, req *types.QueryFeederDelegationRequest) (*types.QueryFeederDelegationResponse, error) {
 	if req == nil {
@@ -114,7 +146,7 @@ func (q querier) FeederDelegation(c context.Context, req *types.QueryFeederDeleg
 }
 
 // MissCounter queries oracle miss counter of a validator
-func (q querier) MissCounter(c context.Context, req *types.QueryMissCounterRequest) (*types.QueryMissCounterResponse, error) {
+func (q querier) VotePenaltyCounter(c context.Context, req *types.QueryVotePenaltyCounterRequest) (*types.QueryVotePenaltyCounterResponse, error) {
 	if req == nil {
 		return nil, status.Error(codes.InvalidArgument, "invalid request")
 	}
@@ -125,8 +157,11 @@ func (q querier) MissCounter(c context.Context, req *types.QueryMissCounterReque
 	}
 
 	ctx := sdk.UnwrapSDKContext(c)
-	return &types.QueryMissCounterResponse{
-		MissCounter: q.GetMissCounter(ctx, valAddr),
+	return &types.QueryVotePenaltyCounterResponse{
+		VotePenaltyCounter: &types.VotePenaltyCounter{
+			MissCount:    q.GetMissCount(ctx, valAddr),
+			AbstainCount: q.GetAbstainCount(ctx, valAddr),
+		},
 	}, nil
 }
 

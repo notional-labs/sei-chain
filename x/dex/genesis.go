@@ -19,14 +19,14 @@ func InitGenesis(ctx sdk.Context, k keeper.Keeper, genState types.GenesisState) 
 		k.SetShortBook(ctx, "genesis", elem)
 	}
 
+	// Set initial tick size for each pair
+	// tick size is the minimum unit that can be traded for certain pair
+	for _, elem := range genState.TickSizeList {
+		k.SetDefaultTickSizeForPair(ctx, *elem.Pair, elem.Ticksize)
+	}
+
 	// this line is used by starport scaffolding # genesis/module/init
 	k.SetParams(ctx, genState.Params)
-
-	for _, twap := range genState.TwapList {
-		twap.LastEpoch = 0
-		twap.TwapPrice = twap.Prices[0]
-		k.SetTwap(ctx, *twap, "genesis")
-	}
 
 	k.SetEpoch(ctx, genState.LastEpoch)
 }

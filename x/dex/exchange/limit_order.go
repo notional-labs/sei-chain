@@ -2,28 +2,27 @@ package exchange
 
 import (
 	sdk "github.com/cosmos/cosmos-sdk/types"
-	dexcache "github.com/sei-protocol/sei-chain/x/dex/cache"
 	"github.com/sei-protocol/sei-chain/x/dex/types"
 )
 
 func MatchLimitOrders(
 	ctx sdk.Context,
-	longOrders []dexcache.LimitOrder,
-	shortOrders []dexcache.LimitOrder,
+	longOrders []types.Order,
+	shortOrders []types.Order,
 	longBook *[]types.OrderBook,
 	shortBook *[]types.OrderBook,
-	pair types.Pair,
 	longDirtyPrices *DirtyPrices,
 	shortDirtyPrices *DirtyPrices,
-	settlements *[]*types.Settlement,
+	settlements *[]*types.SettlementEntry,
+	zeroOrders *[]AccountOrderID,
 ) (sdk.Dec, sdk.Dec) {
 	for _, order := range longOrders {
-		addOrderToOrderBook(order, longBook, pair, longDirtyPrices)
+		addOrderToOrderBook(order, longBook, longDirtyPrices)
 	}
 	for _, order := range shortOrders {
-		addOrderToOrderBook(order, shortBook, pair, shortDirtyPrices)
+		addOrderToOrderBook(order, shortBook, shortDirtyPrices)
 	}
-	var totalExecuted, totalPrice sdk.Dec = sdk.ZeroDec(), sdk.ZeroDec()
+	totalExecuted, totalPrice := sdk.ZeroDec(), sdk.ZeroDec()
 	longPtr, shortPtr := len(*longBook)-1, 0
 
 	for longPtr >= 0 && shortPtr < len(*shortBook) && (*longBook)[longPtr].GetPrice().GTE((*shortBook)[shortPtr].GetPrice()) {
@@ -42,45 +41,41 @@ func MatchLimitOrders(
 
 		longDirtyPrices.Add((*longBook)[longPtr].GetPrice())
 		shortDirtyPrices.Add((*shortBook)[shortPtr].GetPrice())
-		*settlements = append(*settlements, SettleFromBook(
+		newSettlements, zeroAccountOrders := SettleFromBook(
+			ctx,
 			(*longBook)[longPtr],
 			(*shortBook)[shortPtr],
 			executed,
-		)...)
+		)
+		*settlements = append(*settlements, newSettlements...)
+		*zeroOrders = append(*zeroOrders, zeroAccountOrders...)
 
 		if (*longBook)[longPtr].GetEntry().Quantity.IsZero() {
-			longPtr -= 1
+			longPtr--
 		}
 		if (*shortBook)[shortPtr].GetEntry().Quantity.IsZero() {
-			shortPtr += 1
+			shortPtr++
 		}
 	}
 	return totalPrice, totalExecuted
 }
 
 func addOrderToOrderBook(
-	order dexcache.LimitOrder,
+	order types.Order,
 	orderBook *[]types.OrderBook,
-	pair types.Pair,
 	dirtyPrices *DirtyPrices,
 ) {
 	insertAt := -1
+	newAllocation := &types.Allocation{
+		OrderId:  order.Id,
+		Quantity: order.Quantity,
+		Account:  order.Account,
+	}
 	for i, ob := range *orderBook {
 		if ob.GetPrice().Equal(order.Price) {
 			dirtyPrices.Add(ob.GetPrice())
 			ob.GetEntry().Quantity = ob.GetEntry().Quantity.Add(order.Quantity)
-			existing := false
-			for j, allocation := range ob.GetEntry().AllocationCreator {
-				if allocation == order.FormattedCreatorWithSuffix() {
-					existing = true
-					ob.GetEntry().Allocation[j] = ob.GetEntry().Allocation[j].Add(order.Quantity)
-					break
-				}
-			}
-			if !existing {
-				ob.GetEntry().AllocationCreator = append(ob.GetEntry().AllocationCreator, order.FormattedCreatorWithSuffix())
-				ob.GetEntry().Allocation = append(ob.GetEntry().Allocation, order.Quantity)
-			}
+			ob.GetEntry().Allocations = append(ob.GetEntry().Allocations, newAllocation)
 			return
 		}
 		if order.Price.LT(ob.GetPrice()) {
@@ -89,29 +84,27 @@ func addOrderToOrderBook(
 		}
 	}
 	var newOrder types.OrderBook
-	switch order.Direction {
+	switch order.PositionDirection {
 	case types.PositionDirection_LONG:
 		newOrder = &types.LongBook{
 			Price: order.Price,
 			Entry: &types.OrderEntry{
-				Price:             order.Price,
-				Quantity:          order.Quantity,
-				AllocationCreator: []string{order.FormattedCreatorWithSuffix()},
-				Allocation:        []sdk.Dec{order.Quantity},
-				PriceDenom:        pair.PriceDenom,
-				AssetDenom:        pair.AssetDenom,
+				Price:       order.Price,
+				Quantity:    order.Quantity,
+				Allocations: []*types.Allocation{newAllocation},
+				PriceDenom:  order.PriceDenom,
+				AssetDenom:  order.AssetDenom,
 			},
 		}
 	case types.PositionDirection_SHORT:
 		newOrder = &types.ShortBook{
 			Price: order.Price,
 			Entry: &types.OrderEntry{
-				Price:             order.Price,
-				Quantity:          order.Quantity,
-				AllocationCreator: []string{order.FormattedCreatorWithSuffix()},
-				Allocation:        []sdk.Dec{order.Quantity},
-				PriceDenom:        pair.PriceDenom,
-				AssetDenom:        pair.AssetDenom,
+				Price:       order.Price,
+				Quantity:    order.Quantity,
+				Allocations: []*types.Allocation{newAllocation},
+				PriceDenom:  order.PriceDenom,
+				AssetDenom:  order.AssetDenom,
 			},
 		}
 	}
@@ -123,5 +116,4 @@ func addOrderToOrderBook(
 		(*orderBook)[insertAt] = newOrder
 	}
 	dirtyPrices.Add(order.Price)
-	return
 }

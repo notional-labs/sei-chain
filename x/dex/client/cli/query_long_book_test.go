@@ -28,12 +28,11 @@ func networkWithLongBookObjects(t *testing.T, n int) (*network.Network, []types.
 		longBook := types.LongBook{
 			Price: sdk.NewDec(int64(1 + i)),
 			Entry: &types.OrderEntry{
-				Price:             sdk.NewDec(int64(1 + i)),
-				Quantity:          sdk.NewDec(int64(i)),
-				AllocationCreator: []string{"abc|c|"},
-				Allocation:        []sdk.Dec{sdk.NewDec(int64(1))},
-				PriceDenom:        TEST_PAIR().PriceDenom,
-				AssetDenom:        TEST_PAIR().AssetDenom,
+				Price:       sdk.NewDec(int64(1 + i)),
+				Quantity:    sdk.NewDec(int64(i)),
+				Allocations: []*types.Allocation{{Account: "abc", Quantity: sdk.NewDec(int64(i)), OrderId: 1}},
+				PriceDenom:  TEST_PAIR().PriceDenom,
+				AssetDenom:  TEST_PAIR().AssetDenom,
 			},
 		}
 		nullify.Fill(&longBook)
@@ -75,7 +74,7 @@ func TestShowLongBook(t *testing.T) {
 		tc := tc
 		t.Run(tc.desc, func(t *testing.T) {
 			// the longbook orders are from genesis contract as created from networkWithLongBookObjects
-			args := []string{"genesis", tc.price, TEST_PAIR().PriceDenom.String(), TEST_PAIR().AssetDenom.String()}
+			args := []string{"genesis", tc.price, TEST_PAIR().PriceDenom, TEST_PAIR().AssetDenom}
 			args = append(args, tc.args...)
 			out, err := clitestutil.ExecTestCLICmd(ctx, cli.CmdShowLongBook(), args)
 			if tc.err != nil {
@@ -102,7 +101,7 @@ func TestListLongBook(t *testing.T) {
 	ctx := net.Validators[0].ClientCtx
 	request := func(next []byte, offset, limit uint64, total bool) []string {
 		args := []string{
-			"genesis", TEST_PAIR().PriceDenom.String(), TEST_PAIR().AssetDenom.String(),
+			"genesis", TEST_PAIR().PriceDenom, TEST_PAIR().AssetDenom,
 			fmt.Sprintf("--%s=json", tmcli.OutputFlag),
 		}
 		if next == nil {

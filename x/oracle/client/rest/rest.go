@@ -7,10 +7,10 @@ import (
 	"github.com/gorilla/mux"
 )
 
-//nolint
 const (
-	RestDenom = "denom"
-	RestVoter = "voter"
+	RestDenom           = "denom"
+	RestVoter           = "voter"
+	RestLookbackSeconds = "lookback_seconds"
 )
 
 // RegisterRoutes registers oracle-related REST handlers to a router

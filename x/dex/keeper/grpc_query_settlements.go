@@ -3,52 +3,56 @@ package keeper
 import (
 	"context"
 
-	"github.com/cosmos/cosmos-sdk/store/prefix"
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	sdkerrors "github.com/cosmos/cosmos-sdk/types/errors"
-	"github.com/cosmos/cosmos-sdk/types/query"
 	"github.com/sei-protocol/sei-chain/x/dex/types"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 )
 
-func (k Keeper) SettlementsAll(c context.Context, req *types.QueryAllSettlementsRequest) (*types.QueryAllSettlementsResponse, error) {
+const MaxSettlementsLimit = 100
+
+func (k Keeper) GetSettlements(c context.Context, req *types.QueryGetSettlementsRequest) (*types.QueryGetSettlementsResponse, error) {
 	if req == nil {
 		return nil, status.Error(codes.InvalidArgument, "invalid request")
 	}
 
-	var settlements []types.Settlements
 	ctx := sdk.UnwrapSDKContext(c)
 
-	store := ctx.KVStore(k.storeKey)
-	settlementStore := prefix.NewStore(store, types.KeyPrefix(types.SettlementEntryKey))
-
-	pageRes, err := query.Paginate(settlementStore, req.Pagination, func(key []byte, value []byte) error {
-		var settlement types.Settlements
-		if err := k.Cdc.Unmarshal(value, &settlement); err != nil {
-			return err
-		}
-
-		settlements = append(settlements, settlement)
-		return nil
-	})
-	if err != nil {
-		return nil, status.Error(codes.Internal, err.Error())
+	settlements, found := k.GetSettlementsState(ctx, req.ContractAddr, req.PriceDenom, req.AssetDenom, req.Account, req.OrderId)
+	if !found {
+		return &types.QueryGetSettlementsResponse{}, sdkerrors.ErrKeyNotFound
 	}
 
-	return &types.QueryAllSettlementsResponse{Settlements: settlements, Pagination: pageRes}, nil
+	return &types.QueryGetSettlementsResponse{Settlements: settlements}, nil
 }
 
-func (k Keeper) Settlements(c context.Context, req *types.QueryGetSettlementsRequest) (*types.QueryGetSettlementsResponse, error) {
+func (k Keeper) GetSettlementsForAccount(c context.Context, req *types.QueryGetSettlementsForAccountRequest) (*types.QueryGetSettlementsForAccountResponse, error) {
 	if req == nil {
 		return nil, status.Error(codes.InvalidArgument, "invalid request")
 	}
 
 	ctx := sdk.UnwrapSDKContext(c)
-	Settlements, found := k.GetSettlements(ctx, req.ContractAddr, req.BlockHeight, req.PriceDenom, req.AssetDenom)
-	if !found {
-		return nil, sdkerrors.ErrKeyNotFound
+
+	settlementsList := k.GetSettlementsStateForAccount(ctx, req.ContractAddr, req.PriceDenom, req.AssetDenom, req.Account)
+
+	return &types.QueryGetSettlementsForAccountResponse{SettlementsList: settlementsList}, nil
+}
+
+func (k Keeper) GetAllSettlements(c context.Context, req *types.QueryGetAllSettlementsRequest) (*types.QueryGetAllSettlementsResponse, error) {
+	if req == nil {
+		return nil, status.Error(codes.InvalidArgument, "invalid request")
+	}
+	if req.Limit == 0 {
+		req.Limit = MaxSettlementsLimit
+	}
+	if req.Limit > MaxSettlementsLimit {
+		return nil, status.Error(codes.InvalidArgument, "too many values requested")
 	}
 
-	return &types.QueryGetSettlementsResponse{Settlements: Settlements}, nil
+	ctx := sdk.UnwrapSDKContext(c)
+
+	settlementsList := k.GetAllSettlementsState(ctx, req.ContractAddr, req.PriceDenom, req.AssetDenom, int(req.Limit))
+
+	return &types.QueryGetAllSettlementsResponse{SettlementsList: settlementsList}, nil
 }

@@ -9,16 +9,15 @@ import (
 // NewGenesisState creates a new GenesisState object
 func NewGenesisState(
 	params Params, rates []ExchangeRateTuple,
-	feederDelegations []FeederDelegation, missCounters []MissCounter,
+	feederDelegations []FeederDelegation, penaltyCounters []PenaltyCounter,
 	aggregateExchangeRatePrevotes []AggregateExchangeRatePrevote,
 	aggregateExchangeRateVotes []AggregateExchangeRateVote,
 ) *GenesisState {
-
 	return &GenesisState{
 		Params:                        params,
 		ExchangeRates:                 rates,
 		FeederDelegations:             feederDelegations,
-		MissCounters:                  missCounters,
+		PenaltyCounters:               penaltyCounters,
 		AggregateExchangeRatePrevotes: aggregateExchangeRatePrevotes,
 		AggregateExchangeRateVotes:    aggregateExchangeRateVotes,
 	}
@@ -30,7 +29,7 @@ func DefaultGenesisState() *GenesisState {
 		Params:                        DefaultParams(),
 		ExchangeRates:                 []ExchangeRateTuple{},
 		FeederDelegations:             []FeederDelegation{},
-		MissCounters:                  []MissCounter{},
+		PenaltyCounters:               []PenaltyCounter{},
 		AggregateExchangeRatePrevotes: []AggregateExchangeRatePrevote{},
 		AggregateExchangeRateVotes:    []AggregateExchangeRateVote{},
 	}

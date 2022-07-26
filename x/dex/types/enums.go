@@ -1,25 +1,9 @@
 package types
 
 import (
-	"errors"
 	"fmt"
 	"strings"
 )
-
-const MICRO_PREFIX = byte('u')
-
-func GetDenomFromStr(str string) (Denom, Unit, error) {
-	val, err := getEnumFromStr(str, Denom_value)
-	if err != nil {
-		if str[0] == MICRO_PREFIX {
-			microVal, microErr := getEnumFromStr(str[1:], Denom_value)
-			if microErr == nil {
-				return Denom(microVal), Unit_MICRO, nil
-			}
-		}
-	}
-	return Denom(val), Unit_STANDARD, err
-}
 
 func GetPositionEffectFromStr(str string) (PositionEffect, error) {
 	val, err := getEnumFromStr(str, PositionEffect_value)
@@ -40,23 +24,21 @@ func getEnumFromStr(str string, enumMap map[string]int32) (int32, error) {
 	upperStr := strings.ToUpper(str)
 	if val, ok := enumMap[upperStr]; ok {
 		return val, nil
-	} else {
-		return 0, errors.New(fmt.Sprintf("Unknown enum literal: %s", str))
 	}
+	return 0, fmt.Errorf("unknown enum literal: %s", str)
 }
 
-func GetContractDenomName(denom Denom) string {
-	return strings.ToLower(Denom_name[int32(denom)])
-}
-
+//nolint:staticcheck // following the linter here requires changes in the sdk, I reckon.
 func GetContractPositionDirection(direction PositionDirection) string {
 	return strings.Title(strings.ToLower(PositionDirection_name[int32(direction)]))
 }
 
+//nolint:staticcheck // following the linter here requires changes in the sdk, I reckon.
 func GetContractPositionEffect(effect PositionEffect) string {
 	return strings.Title(strings.ToLower(PositionEffect_name[int32(effect)]))
 }
 
+//nolint:staticcheck // following the linter here requires changes in the sdk, I reckon.
 func GetContractOrderType(orderType OrderType) string {
 	return strings.Title(strings.ToLower(OrderType_name[int32(orderType)]))
 }

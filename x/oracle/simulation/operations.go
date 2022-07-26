@@ -1,6 +1,6 @@
 package simulation
 
-//DONTCOVER
+// DONTCOVER
 
 import (
 	"math/rand"
@@ -20,6 +20,7 @@ import (
 )
 
 // Simulation operation weights constants
+//nolint:gosec // these aren't hard coded credentials.
 const (
 	OpWeightMsgAggregateExchangeRatePrevote = "op_weight_msg_exchange_rate_aggregate_prevote"
 	OpWeightMsgAggregateExchangeRateVote    = "op_weight_msg_exchange_rate_aggregate_vote"
@@ -29,8 +30,8 @@ const (
 )
 
 var (
-	whitelist                     = []string{utils.MicroAtomDenom}
-	voteHashMap map[string]string = make(map[string]string)
+	whitelist   = []string{utils.MicroAtomDenom}
+	voteHashMap = make(map[string]string)
 )
 
 // WeightedOperations returns all the operations from the module with their respective weights
@@ -39,7 +40,8 @@ func WeightedOperations(
 	cdc codec.JSONCodec,
 	ak types.AccountKeeper,
 	bk types.BankKeeper,
-	k keeper.Keeper) simulation.WeightedOperations {
+	k keeper.Keeper,
+) simulation.WeightedOperations {
 	var (
 		weightMsgAggregateExchangeRatePrevote int
 		weightMsgAggregateExchangeRateVote    int
@@ -85,7 +87,6 @@ func SimulateMsgAggregateExchangeRatePrevote(ak types.AccountKeeper, bk types.Ba
 	return func(
 		r *rand.Rand, app *baseapp.BaseApp, ctx sdk.Context, accs []simtypes.Account, chainID string,
 	) (simtypes.OperationMsg, []simtypes.FutureOperation, error) {
-
 		simAccount, _ := simtypes.RandomAcc(r, accs)
 		address := sdk.ValAddress(simAccount.Address)
 
@@ -149,7 +150,6 @@ func SimulateMsgAggregateExchangeRateVote(ak types.AccountKeeper, bk types.BankK
 	return func(
 		r *rand.Rand, app *baseapp.BaseApp, ctx sdk.Context, accs []simtypes.Account, chainID string,
 	) (simtypes.OperationMsg, []simtypes.FutureOperation, error) {
-
 		simAccount, _ := simtypes.RandomAcc(r, accs)
 		address := sdk.ValAddress(simAccount.Address)
 
@@ -166,13 +166,12 @@ func SimulateMsgAggregateExchangeRateVote(ak types.AccountKeeper, bk types.BankK
 		}
 
 		// get prevote
-		prevote, err := k.GetAggregateExchangeRatePrevote(ctx, address)
+		_, err := k.GetAggregateExchangeRatePrevote(ctx, address)
 		if err != nil {
 			return simtypes.NoOpMsg(types.ModuleName, types.TypeMsgAggregateExchangeRateVote, "prevote not found"), nil, nil
 		}
 
-		params := k.GetParams(ctx)
-		if (uint64(ctx.BlockHeight())/params.VotePeriod)-(prevote.SubmitBlock/params.VotePeriod) != 1 {
+		if !k.IsPrevoteFromPreviousWindow(ctx, address) {
 			return simtypes.NoOpMsg(types.ModuleName, types.TypeMsgAggregateExchangeRateVote, "reveal period of submitted vote do not match with registered prevote"), nil, nil
 		}
 
@@ -199,7 +198,6 @@ func SimulateMsgAggregateExchangeRateVote(ak types.AccountKeeper, bk types.BankK
 			[]uint64{feederAccount.GetSequence()},
 			feederSimAccount.PrivKey,
 		)
-
 		if err != nil {
 			return simtypes.NoOpMsg(types.ModuleName, msg.Type(), "unable to generate mock tx"), nil, err
 		}
@@ -219,7 +217,6 @@ func SimulateMsgDelegateFeedConsent(ak types.AccountKeeper, bk types.BankKeeper,
 	return func(
 		r *rand.Rand, app *baseapp.BaseApp, ctx sdk.Context, accs []simtypes.Account, chainID string,
 	) (simtypes.OperationMsg, []simtypes.FutureOperation, error) {
-
 		simAccount, _ := simtypes.RandomAcc(r, accs)
 		delegateAccount, _ := simtypes.RandomAcc(r, accs)
 		valAddress := sdk.ValAddress(simAccount.Address)
@@ -257,7 +254,6 @@ func SimulateMsgDelegateFeedConsent(ak types.AccountKeeper, bk types.BankKeeper,
 			[]uint64{account.GetSequence()},
 			simAccount.PrivKey,
 		)
-
 		if err != nil {
 			return simtypes.NoOpMsg(types.ModuleName, msg.Type(), "unable to generate mock tx"), nil, err
 		}

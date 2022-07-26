@@ -2,50 +2,39 @@ package keeper
 
 import (
 	"context"
+	"fmt"
 
 	sdk "github.com/cosmos/cosmos-sdk/types"
-	dexcache "github.com/sei-protocol/sei-chain/x/dex/cache"
 	"github.com/sei-protocol/sei-chain/x/dex/types"
 	"go.opentelemetry.io/otel/attribute"
 	otrace "go.opentelemetry.io/otel/trace"
 )
 
-func (k *Keeper) HandleEBCancelOrders(ctx context.Context, sdkCtx sdk.Context, tracer *otrace.Tracer, contractAddr string, registeredPairs []types.Pair) {
+func (k *Keeper) HandleEBCancelOrders(ctx context.Context, sdkCtx sdk.Context, tracer *otrace.Tracer, contractAddr string, registeredPairs []types.Pair) error {
 	_, span := (*tracer).Start(ctx, "SudoCancelOrders")
 	span.SetAttributes(attribute.String("contractAddr", contractAddr))
 
-	msg := k.getCancelSudoMsg(contractAddr, registeredPairs)
-	_ = k.CallContractSudo(sdkCtx, contractAddr, msg)
-	for _, pair := range registeredPairs {
-		pairStr := pair.String()
-		if orderCancellations, ok := k.OrderCancellations[contractAddr][pairStr]; ok {
-			for _, orderCancellation := range orderCancellations.OrderCancellations {
-				k.Orders[contractAddr][pairStr].AddCancelOrder(dexcache.CancelOrder{
-					Creator:   orderCancellation.Creator,
-					Price:     orderCancellation.Price,
-					Quantity:  orderCancellation.Quantity,
-					Direction: orderCancellation.Direction,
-					Effect:    orderCancellation.Effect,
-					Leverage:  orderCancellation.Leverage,
-				})
-			}
-		}
+	typedContractAddr := types.ContractAddress(contractAddr)
+	msg := k.getCancelSudoMsg(typedContractAddr, registeredPairs)
+	if _, err := k.CallContractSudo(sdkCtx, contractAddr, msg); err != nil {
+		sdkCtx.Logger().Error(fmt.Sprintf("Error during cancellation: %s", err.Error()))
+		return err
 	}
 	span.End()
+	return nil
 }
 
-func (k *Keeper) getCancelSudoMsg(contractAddr string, registeredPairs []types.Pair) types.SudoOrderCancellationMsg {
-	contractOrderCancellations := []types.ContractOrderCancellation{}
+func (k *Keeper) getCancelSudoMsg(typedContractAddr types.ContractAddress, registeredPairs []types.Pair) types.SudoOrderCancellationMsg {
+	idsToCancel := []uint64{}
 	for _, pair := range registeredPairs {
-		if orderCancellations, ok := k.OrderCancellations[contractAddr][pair.String()]; ok {
-			for _, orderCancellation := range orderCancellations.OrderCancellations {
-				contractOrderCancellations = append(contractOrderCancellations, dexcache.ToContractOrderCancellation(orderCancellation))
-			}
+		typedPairStr := types.GetPairString(&pair) //nolint:gosec // THIS MAY BE CAUSE FOR CONCERN AND WE MIGHT WANT TO REFACTOR.
+		for _, cancel := range *k.MemState.GetBlockCancels(typedContractAddr, typedPairStr) {
+			idsToCancel = append(idsToCancel, cancel.Id)
 		}
 	}
 	return types.SudoOrderCancellationMsg{
 		OrderCancellations: types.OrderCancellationMsgDetails{
-			OrderCancellations: contractOrderCancellations,
+			IdsToCancel: idsToCancel,
 		},
 	}
 }

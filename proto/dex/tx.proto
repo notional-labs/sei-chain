@@ -3,10 +3,8 @@ package seiprotocol.seichain.dex;
 
 import "cosmos/base/v1beta1/coin.proto";
 import "gogoproto/gogo.proto";
-import "dex/order_placement.proto";
-import "dex/order_cancellation.proto";
-import "dex/pair.proto";
 import "dex/contract.proto";
+import "dex/order.proto";
 
 // this line is used by starport scaffolding # proto/tx/import
 
@@ -17,7 +15,6 @@ service Msg {
   rpc PlaceOrders(MsgPlaceOrders) returns (MsgPlaceOrdersResponse);
   rpc CancelOrders(MsgCancelOrders) returns (MsgCancelOrdersResponse);
   rpc Liquidate(MsgLiquidation) returns (MsgLiquidationResponse);
-  rpc RegisterPair(MsgRegisterPair) returns (MsgRegisterPairResponse);
   rpc RegisterContract(MsgRegisterContract) returns(MsgRegisterContractResponse);
   // privileged endpoints below
 
@@ -25,12 +22,22 @@ service Msg {
 }
 
 message MsgPlaceOrders {
-  string creator = 1;
-  repeated OrderPlacement orders = 2;
-  string contractAddr = 3;
+  string creator = 1 [
+      (gogoproto.jsontag) = "creator"
+  ];
+  repeated Order orders = 2 [
+      (gogoproto.jsontag) = "orders"
+  ];
+  string contractAddr = 3 [
+      (gogoproto.jsontag) = "contract_address"
+  ];
   repeated cosmos.base.v1beta1.Coin funds = 4 [
     (gogoproto.nullable) = false,
-    (gogoproto.castrepeated) = "github.com/cosmos/cosmos-sdk/types.Coins"
+    (gogoproto.castrepeated) = "github.com/cosmos/cosmos-sdk/types.Coins",
+    (gogoproto.jsontag) = "funds"
+  ];
+  bool autoCalculateDeposit = 5 [
+      (gogoproto.jsontag) = "auto_calculate_deposit"
   ];
 }
 
@@ -39,9 +46,15 @@ message MsgPlaceOrdersResponse {
 }
 
 message MsgCancelOrders {
-  string creator = 1;
-  repeated OrderCancellation orderCancellations = 2;
-  string contractAddr = 3;
+  string creator = 1 [
+      (gogoproto.jsontag) = "creator"
+  ];
+  repeated uint64 orderIds = 2 [
+      (gogoproto.jsontag) = "order_ids"
+  ];
+  string contractAddr = 3 [
+      (gogoproto.jsontag) = "contract_address"
+  ];
 }
 
 message MsgCancelOrdersResponse {}
@@ -53,14 +66,6 @@ message MsgLiquidation {
 }
 
 message MsgLiquidationResponse {}
-
-message MsgRegisterPair {
-  string creator = 1;
-  string contractAddr = 2;
-  Pair pair = 3;
-}
-
-message MsgRegisterPairResponse {}
 
 message MsgRegisterContract {
   string creator = 1;

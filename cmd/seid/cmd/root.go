@@ -2,9 +2,6 @@ package cmd
 
 import (
 	"errors"
-	"github.com/cosmos/cosmos-sdk/codec"
-	"github.com/sei-protocol/sei-chain/app"
-	"github.com/sei-protocol/sei-chain/app/params"
 	"io"
 	"os"
 	"path/filepath"
@@ -18,6 +15,7 @@ import (
 	"github.com/cosmos/cosmos-sdk/client/flags"
 	"github.com/cosmos/cosmos-sdk/client/keys"
 	"github.com/cosmos/cosmos-sdk/client/rpc"
+	"github.com/cosmos/cosmos-sdk/codec"
 	"github.com/cosmos/cosmos-sdk/server"
 	serverconfig "github.com/cosmos/cosmos-sdk/server/config"
 	servertypes "github.com/cosmos/cosmos-sdk/server/types"
@@ -29,6 +27,9 @@ import (
 	banktypes "github.com/cosmos/cosmos-sdk/x/bank/types"
 	"github.com/cosmos/cosmos-sdk/x/crisis"
 	genutilcli "github.com/cosmos/cosmos-sdk/x/genutil/client/cli"
+	"github.com/sei-protocol/sei-chain/app"
+	"github.com/sei-protocol/sei-chain/app/params"
+	"github.com/sei-protocol/sei-chain/wasmbinding"
 	"github.com/spf13/cast"
 	"github.com/spf13/cobra"
 	tmcli "github.com/tendermint/tendermint/libs/cli"
@@ -40,13 +41,14 @@ import (
 type Option func(*rootOptions)
 
 // scaffoldingOptions keeps set of options to apply scaffolding.
+// nolint:unused // preserving this becase don't know if it is needed.
 type rootOptions struct {
 	addSubCmds         []*cobra.Command
 	startCmdCustomizer func(*cobra.Command)
 	envPrefix          string
 }
 
-func (s *rootOptions) apply(options ...Option) {
+func (s *rootOptions) apply(options ...Option) { // nolint:unused // I figure this gets used later.
 	for _, o := range options {
 		o(s)
 	}
@@ -230,7 +232,9 @@ func newApp(
 		panic(err)
 	}
 
-	wasmopts := []wasm.Option{wasmkeeper.WithMessageEncoders(&wasmkeeper.MessageEncoders{})}
+	wasmopts := []wasm.Option{wasmkeeper.WithMessageEncoders(&wasmkeeper.MessageEncoders{
+		Custom: wasmbinding.CustomEncoder,
+	})}
 
 	return app.New(
 		logger,
@@ -327,6 +331,10 @@ func initAppConfig() (string, interface{}) {
 	// In simapp, we set the min gas prices to 0.
 	srvCfg.MinGasPrices = "0.01usei"
 	srvCfg.API.Enable = true
+
+	// TODO: remove before mainnet launch
+	srvCfg.API.EnableUnsafeCORS = true
+	srvCfg.GRPCWeb.EnableUnsafeCORS = true
 
 	customAppConfig := CustomAppConfig{
 		Config: *srvCfg,
